@@ -20,6 +20,14 @@ Fork from [terraform-provider-virtualbox](https://github.com/ccll/terraform-prov
 6. terraform plan
 7. terraform apply
 
+# Debug
+
+You can set the `TF_LOG` environment variable if you need verbose log messages. (c.f. https://www.terraform.io/docs/internals/debugging.html)
+
+```
+export  TF_LOG=TRACE
+```
+
 # Resources
 
 ## "virtualbox_vm"
@@ -81,7 +89,11 @@ output "IPAddr" {
 
 - Experimental provider!
 
+- Virtualbox Guest Additions *must* be already installed in order to properly detect the IP of the box
+
 # Example images
+
+- [ Centos 7 with Guest Additions](https://atlas.hashicorp.com/geerlingguy/boxes/centos7/versions/1.2.1)
 
 - [ubuntu-15.04](https://github.com/ccll/terraform-provider-virtualbox-images/releases/tag/ubuntu-15.04)
 
