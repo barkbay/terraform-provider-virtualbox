@@ -2,8 +2,6 @@ package provider
 
 import (
 	"fmt"
-	"github.com/dustin/go-humanize"
-	"github.com/hashicorp/terraform/helper/resource"
 	"log"
 	"os"
 	"os/user"
@@ -12,16 +10,21 @@ import (
 	"sync"
 	"time"
 
-	vbox "github.com/pyToshka/go-virtualbox"
-	"github.com/hashicorp/terraform/helper/schema"
-	multierror "github.com/hashicorp/go-multierror"
-	"os/exec"
-	"runtime"
+	"github.com/dustin/go-humanize"
+	"github.com/hashicorp/terraform/helper/resource"
+
 	"io"
 	"net/http"
+	"os/exec"
+	"runtime"
+
+	multierror "github.com/hashicorp/go-multierror"
+	"github.com/hashicorp/terraform/helper/schema"
+	vbox "github.com/pyToshka/go-virtualbox"
 )
+
 var (
-	VBM     string // Path to VBoxManage utility.
+	VBM string // Path to VBoxManage utility.
 )
 
 func init() {
@@ -138,10 +141,10 @@ func resourceVMCreate(d *schema.ResourceData, meta interface{}) error {
 	/* TODO: allow partial updates */
 	if len(d.Get("url").(string)) > 0 {
 		path := d.Get("image").(string)
-		url:= d.Get("url").(string)
+		url := d.Get("url").(string)
 		// Create the file
 		out, err := os.Create(path)
-		if err != nil  {
+		if err != nil {
 			return err
 		}
 		defer out.Close()
@@ -153,7 +156,7 @@ func resourceVMCreate(d *schema.ResourceData, meta interface{}) error {
 		defer resp.Body.Close()
 		// Writer the body to file
 		_, err = io.Copy(out, resp.Body)
-		if err != nil  {
+		if err != nil {
 			return err
 		}
 	}
@@ -209,14 +212,18 @@ func resourceVMCreate(d *schema.ResourceData, meta interface{}) error {
 		if p := os.Getenv("VBOX_INSTALL_PATH"); p != "" && runtime.GOOS == "windows" {
 			VBM = filepath.Join(p, "VBoxManage.exe")
 		}
-		setuiid := exec.Command(VBM + "internalcommands sethduuid " +src)
+		setuiid := exec.Command(VBM, "internalcommands", "sethduuid", src)
 		err := setuiid.Run()
-		imageOpMutex.Lock() // Sequentialize image cloning to improve disk performance
-		err = vbox.CloneHD(src, target)
-		imageOpMutex.Unlock()
 		if err != nil {
-			log.Printf("[ERROR] Clone *.vdi and *.vmdk to VM folder: %s", err.Error())
+			log.Printf("[ERROR] internalcommands sethduuid failed: %s", err.Error())
 			return err
+		}
+		imageOpMutex.Lock() // Sequentialize image cloning to improve disk performance
+		errClone := vbox.CloneHD(src, target)
+		imageOpMutex.Unlock()
+		if errClone != nil {
+			log.Printf("[ERROR] Clone *.vdi and *.vmdk to VM folder: %s", errClone.Error())
+			return errClone
 		}
 	}
 
@@ -409,7 +416,7 @@ func WaitUntilVMIsReady(d *schema.ResourceData, vm *vbox.Machine, meta interface
 			continue
 		}
 		key := fmt.Sprintf("network_adapter.%d.ipv4_address_available", i)
-		_, err = WaitForVMAttribute(d,[]string{"yes"}, []string{"no"}, key, meta, 3*time.Second, 3*time.Second)
+		_, err = WaitForVMAttribute(d, []string{"yes"}, []string{"no"}, key, meta, 3*time.Second, 3*time.Second)
 		if err != nil {
 			return fmt.Errorf(
 				"Error waiting for VM (%s) to become ready: %s", d.Get("name"), err)
@@ -705,6 +712,8 @@ func newVMStateRefreshFunc(
 		}
 
 		// See if we can access our attribute
+		log.Printf(
+			"[INFO] Waiting for VM to have attribute %s", attribute)
 		if attr, ok := d.GetOk(attribute); ok {
 			// Retrieve the VM properties
 			vm, err := vbox.GetMachine(d.Id())
